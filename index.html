@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Skill Card Search</title>
+  <style>
+    :root {
+      --primary: #2563eb;
+      --bg: #f9fafb;
+      --card-bg: #ffffff;
+      --border: #e5e7eb;
+      --radius: 8px;
+      --shadow: 0 1px 4px rgba(0,0,0,0.08);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen,
+        Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
+      background: var(--bg);
+      color: #111827;
+    }
+    header {
+      padding: 1rem 2rem;
+      background: var(--card-bg);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      position: sticky;
+      top: 0;
+    }
+    header input {
+      flex: 1;
+      padding: 0.6rem 0.8rem;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      font-size: 1rem;
+      outline: none;
+    }
+    header button {
+      background: var(--primary);
+      color: white;
+      border: none;
+      padding: 0.6rem 1rem;
+      border-radius: var(--radius);
+      cursor: pointer;
+    }
+    main {
+      padding: 2rem;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    #cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+      gap: 1.5rem;
+    }
+
+    /* layout */
+    .layout { display: flex; gap: 1.5rem; }
+    #filters {
+      width: 240px;
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1rem;
+      font-size: 0.9rem;
+    }
+    #filters h4 { margin: 0 0 0.5rem; font-size: 1rem; }
+    #filters button.link-btn { background: none; border: none; color: var(--primary); cursor: pointer; font-size: 0.75rem; }
+    .filter-block { margin-top: 1rem; }
+    .filter-block p { margin: 0 0 0.25rem; font-weight: 600; }
+    .chips { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 0.5rem 0; }
+    .tag { background:#e5e7eb; border-radius:var(--radius); padding:0.25rem 0.6rem; cursor:pointer; font-size:0.75rem; }
+    .tag.selected{ background: var(--primary); color:#fff; }
+    .chip { background: #e5e7eb; border-radius: var(--radius); padding: 0.2rem 0.5rem; font-size: 0.75rem; display: flex; align-items: center; }
+    .chip button { margin-left: 4px; background: none; border: none; cursor: pointer; }
+    #results { flex: 1; }
+    #skillInput { width: 100%; padding: 0.4rem; border: 1px solid var(--border); border-radius: var(--radius); }
+
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1rem;
+      box-shadow: var(--shadow);
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+    .card h3 {
+      margin: 0 0 0.25rem;
+      font-size: 1.1rem;
+    }
+    .badge {
+      display: inline-block;
+      padding: 0.2rem 0.5rem;
+      border-radius: var(--radius);
+      font-size: 0.75rem;
+      background: #dbeafe;
+      color: #1e40af;
+    }
+    .card-img{width:100%;border-radius:var(--radius);} 
+    .stars { color:#fbbf24; font-size:0.9rem; }
+    .owner {
+      font-size: 0.875rem;
+      color: #6b7280;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <input type="text" id="searchInput" placeholder="Search for a skill (e.g., Python)" />
+    <button id="searchBtn">Search</button>
+  </header>
+  <main>
+    <div class="layout">
+      <aside id="filters">
+        <div class="filter-header" style="display:flex;justify-content:space-between;align-items:center;">
+          <h4>Filters</h4>
+          <button id="clearFilters" class="link-btn">Clear all</button>
+        </div>
+
+        <div class="filter-block">
+          <p>Min Rating</p>
+          <select id="ratingFilter">
+            <option value="0">Any</option>
+            <option value="1">★ and up</option>
+            <option value="2">★★ and up</option>
+            <option value="3">★★★ and up</option>
+            <option value="4">★★★★ and up</option>
+            <option value="5">★★★★★</option>
+          </select>
+        </div>
+
+        <div class="filter-block">
+          <div style="display:flex;justify-content:space-between;">
+            <p>Skills</p>
+            <button id="clearSkillFilters" class="link-btn">Clear</button>
+          </div>
+          <div id="skillTags" class="chips"></div>
+        </div>
+      </aside>
+
+      <section id="results" style="flex:1;">
+        <div id="statusMsg"></div>
+        <div id="cards"></div>
+      </section>
+    </div>
+  </main>
+
+  <script>
+    const searchInput = document.getElementById('searchInput');
+    const searchBtn   = document.getElementById('searchBtn');
+    const cardsDiv    = document.getElementById('cards');
+    const statusMsg   = document.getElementById('statusMsg');
+
+    // --- event wiring (live search with debounce) ---
+    let debounceTimer;
+    searchInput.addEventListener('input', () => {
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        fetchCards(searchInput.value.trim());
+      }, 300); // wait 300ms after typing stops
+    });
+
+    // Still allow manual search via button click
+    searchBtn.addEventListener('click', () => fetchCards(searchInput.value.trim()));
+
+    // Load all cards on first paint
+    window.addEventListener('DOMContentLoaded', () => fetchCards());
+
+    async function fetchCards(term = '') {
+      statusMsg.textContent = 'Loading…';
+      cardsDiv.innerHTML = '';
+      let url = '/api/search';
+      if (term) url += `?term=${encodeURIComponent(term)}`;
+      try {
+        const resp = await fetch(url);
+        if (!resp.ok) throw new Error('Server error');
+                let data = await resp.json();
+        data = applyFilters(data);
+        statusMsg.textContent = `${data.length} card(s) found`;
+        if (!data.length) return;
+        renderCards(data);
+      } catch (err) {
+        console.error(err);
+        statusMsg.textContent = 'Something went wrong. Try again later.';
+      }
+    }
+
+
+    function renderCards(cards) {
+      const frag = document.createDocumentFragment();
+      cards.forEach(c => {
+        const el = document.createElement('div');
+        el.className = 'card';
+        const rating = parseInt(c.status || '0');
+        el.innerHTML = `
+      <img src="${c.card_image}" alt="${c.card_name}" class="card-img" />
+      <h3>${c.card_name}</h3>
+      <div class="stars">${'★'.repeat(rating)}${'☆'.repeat(5-rating)}</div>
+      <div class="owner">Owner: ${c.username}</div>
+      <div class="badge">Holders: ${c.number_of_holders}</div>
+    `;
+        // TODO: add click handler to open trade modal
+        frag.appendChild(el);
+      });
+      cardsDiv.appendChild(frag);
+    }
+
+    // ----- filter helpers -----
+    const ratingSelect = document.getElementById('ratingFilter');
+    ratingSelect.addEventListener('change', () => fetchCards(searchInput.value.trim()));
+
+    const skillTagsContainer = document.getElementById('skillTags');
+    const selectedSkills = [];
+    const allSkills = ["JavaScript","Baking","Python","Guitar","UI/UX","Sketch","Machine Learning","R","Italian Cooking","Food Photography","Flutter","Kotlin","Copywriting","SEO","Docker","Kubernetes","Yoga","Meditation","Blender","3D Modeling"];
+    renderSkillTags();
+
+
+
+    function renderSkillTags(){
+      skillTagsContainer.innerHTML='';
+      allSkills.forEach(skill=>{
+        const span=document.createElement('span');
+        span.className='tag'+(selectedSkills.includes(skill)?' selected':'');
+        span.textContent=skill;
+        span.onclick=()=>toggleSkill(skill);
+        skillTagsContainer.appendChild(span);
+      });
+    }
+
+    function toggleSkill(skill){
+      const idx=selectedSkills.indexOf(skill);
+      if(idx===-1) selectedSkills.push(skill); else selectedSkills.splice(idx,1);
+      renderSkillTags();
+      fetchCards(searchInput.value.trim());
+    }
+
+    // obsolete functions kept empty for safety
+    function addSkill(){}
+
+    document.getElementById('clearFilters').addEventListener('click', () => {
+      selectedSkills.length = 0;
+      renderSkillTags();
+      ratingSelect.value = '0';
+      fetchCards(searchInput.value.trim());
+    });
+
+    document.getElementById('clearSkillFilters').addEventListener('click', () => {
+      selectedSkills.length = 0;
+      renderSkillTags();
+      fetchCards(searchInput.value.trim());
+    });
+
+    function applyFilters(arr) {
+      const minRating = parseInt(ratingSelect.value || '0');
+      return arr.filter(card => {
+        const rating = parseInt(card.status || '0');
+        if (rating < minRating) return false;
+        if (selectedSkills.length && !selectedSkills.includes(card.card_name)) return false;
+        return true;
+      });
+    }
+  </script>
+</body>
+</html>

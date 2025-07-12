@@ -1,0 +1,13 @@
+{
+  "name": "skillcard-platform",
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "better-sqlite3": "^8.0.1",
+    "express": "^4.18.2",
+    "uuid": "^9.0.1"
+  }
+}
